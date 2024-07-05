@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather App</title>
+    <!-- Tailwind CSS CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <!-- Leaflet Geocoder CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+    <!-- Custom CSS -->
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 10% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .dataNotAvailable {
+            background-color: #ffcccc;
+            color: #990000;
+        }
+
+        .dark-mode {
+            background-color: #333;
+            color: #fff;
+        }
+
+        .dark-mode .bg-white {
+            background-color: #444;
+            color: #fff;
+        }
+
+        .dark-mode .text-gray-800 {
+            color: #fff;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="app" class="p-4">
+        <h1 class="text-2xl font-semibold mb-4">Weather App</h1>
+        <div class="flex items-center mb-4">
+            <input type="text" id="cityInput" class="px-4 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring focus:border-blue-300" placeholder="Enter city name">
+            <button onclick="fetchWeatherData()" class="px-4 py-2 bg-blue-500 text-white rounded-r-md hover:bg-blue-600 focus:outline-none focus:ring focus:border-blue-300">Get Weather</button>
+            <button onclick="openModal()" class="ml-4 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring focus:border-gray-300">Select Location on Map</button>
+            <button onclick="toggleDarkMode()" class="ml-auto px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring focus:border-gray-300">Toggle Dark Mode</button>
+        </div>
+
+        <div id="weatherContainer" class="grid grid-cols-1 gap-4"></div>
+
+        <div id="forecastContainer" class="grid grid-cols-1 gap-4">
+            <!-- Forecast Cards will be inserted here -->
+        </div>
+
+        <div id="modal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeModal()">&times;</span>
+                <div id="map" style="height: 400px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <!-- Leaflet Geocoder JavaScript -->
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+    <!-- Custom JavaScript -->
+    <script>
+        const key = "9e7975b6addbfccd3caf8fd278ecc0c4";
+        let darkMode = false;
+
+        // Function to fetch weather data by city name
+        function fetchWeatherData() {
+            const cityName = document.getElementById('cityInput').value;
+            if (cityName) {
+                let url = `https://api.openweathermap.org/data/2.5/weather?q=${cityName}&units=metric&appid=${key}`;
+                fetchWeather(url);
+            }
+        }
+
+        // Function to fetch weather data by coordinates (latitude and longitude)
+        function fetchWeatherDataByCoords(lat, lon) {
+            let url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${key}`;
+            fetchWeather(url);
+        }
+
+        // Fetch weather data from OpenWeatherMap API
+        function fetchWeather(url) {
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.cod === "404") {
+                        renderError();
+                    } else {
+                        renderWeather(data);
+                        fetchForecastData(data.coord.lat, data.coord.lon);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching weather data:', error);
+                    renderError();
+                });
+        }
+
+        // Function to fetch forecast data by coordinates
+        function fetchForecastData(lat, lon) {
+            fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=metric&appid=${key}`)
+                .then(response => response.json())
+                .then(data => {
+                    renderForecast(data);
+                })
+                .catch(error => {
+                    console.error('Error fetching forecast data:', error);
+                    renderError();
+                });
+        }
+
+        // Render weather data to the DOM
+        function renderWeather(data) {
+            const { name, main, weather, wind } = data;
+            const weatherContainer = document.getElementById('weatherContainer');
+            weatherContainer.innerHTML = `
+                <div class="weather-info p-4 rounded-lg shadow-md bg-white dark:bg-gray-800">
+                    <h2 class="text-xl font-semibold">${name}</h2>
+                    <div class="flex justify-between items-center mt-2">
+                        <div>
+                            <p class="text-lg">${main.temp.toFixed(1)}&deg;C</p>
+                            <p>${weather[0].description}</p>
+                        </div>
+                        <div>
+                            <img src="https://openweathermap.org/img/wn/${weather[0].icon}.png" alt="${weather[0].description}" class="w-12 h-12">
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <p>Feels like: ${main.feels_like.toFixed(1)}&deg;C</p>
+                        <p>Humidity: ${main.humidity}%</p>
+                        <p>Wind: ${wind.speed} m/s</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Render forecast data to the DOM
+        function renderForecast(data) {
+            const { list } = data;
+            const forecastContainer = document.getElementById('forecastContainer');
+            forecastContainer.innerHTML = '';
+
+            list.slice(0, 5).forEach(item => {
+                const date = new Date(item.dt * 1000);
+                const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()];
+                const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                forecastContainer.innerHTML += `
+                    <div class="forecast-item p-4 rounded-lg shadow-md bg-white dark:bg-gray-800">
+                        <h3 class="text-lg font-semibold">${dayOfWeek}</h3>
+                        <div class="flex justify-between items-center mt-2">
+                            <div>
+                                <p>${time}</p>
+                                <p>${item.main.temp.toFixed(1)}&deg;C</p>
+                            </div>
+                            <div>
+                                <img src="https://openweathermap.org/img/wn/${item.weather[0].icon}.png" alt="${item.weather[0].description}" class="w-10 h-10">
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <p>${item.weather[0].description}</p>
+                            <p>Humidity: ${item.main.humidity}%</p>
+                            <p>Wind: ${item.wind.speed} m/s</p>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        // Render error message if weather data is not available
+        function renderError() {
+            const weatherContainer = document.getElementById('weatherContainer');
+            weatherContainer.innerHTML = `
+                <div class="dataNotAvailable p-4 rounded-lg shadow-md bg-red-500 text-white">
+                    <p>Weather data not available. Please check the city name or try again later.</p>
+                </div>
+            `;
+        }
+
+        // Function to open the map modal
+        function openModal() {
+            const modal = document.getElementById('modal');
+            modal.style.display = 'block';
+            initMap();
+        }
+
+        // Function to close the map modal
+        function closeModal() {
+            const modal = document.getElementById('modal');
+            modal.style.display = 'none';
+        }
+
+        // Function to initialize Leaflet map and geocoder
+        function initMap() {
+            const map = L.map('map').setView([20.5937, 78.9629], 5);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            const options = {
+                key: 'f2bcfb32d1f441e786bcae761a2f81cd',
+                limit: 10
+            };
+
+            L.Control.geocoder(options)
+                .on('markgeocode', function(e) {
+                    const { lat, lng } = e.geocode.center;
+                    fetchWeatherDataByCoords(lat, lng);
+                    closeModal();
+                })
+                .addTo(map);
+
+            map.on('click', function(e) {
+                const query = `${e.latlng.lat},${e.latlng.lng}`;
+                fetch(`https://api.opencagedata.com/geocode/v1/json?q=${query}&key=${options.key}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const result = data.results[0];
+                        if (result) {
+                            fetchWeatherDataByCoords(result.geometry.lat, result.geometry.lng);
+                            closeModal();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                    });
+            });
+        }
+
+        // Function to toggle dark mode
+        function toggleDarkMode() {
+            darkMode = !darkMode;
+            document.body.classList.toggle('dark-mode', darkMode);
+        }
+
+        // Function to get user's current location and fetch weather data
+        function getUserLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    const { latitude, longitude } = position.coords;
+                    fetchWeatherDataByCoords(latitude, longitude);
+                }, error => {
+                    console.error('Error getting user location:', error);
+                    fetchWeatherData('Belgaum'); // Default city if geolocation fails
+                });
+            } else {
+                console.error('Geolocation is not supported by this browser.');
+                fetchWeatherData('Belgaum'); // Default city if geolocation is not supported
+            }
+        }
+
+        // Add event listener for the Enter key on the input field
+        document.getElementById('cityInput').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                fetchWeatherData();
+            }
+        });
+
+        // Fetch weather data for the user's current location when the app is opened
+        getUserLocation();
+    </script>
+</body>
+</html>
