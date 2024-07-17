@@ -250,14 +250,34 @@
             if (cityName) {
                 let url = `https://api.openweathermap.org/data/2.5/weather?q=${cityName}&units=metric&appid=${key}`;
                 fetchWeather(url);
+                console.log(url)
+                
             }
+    
         }
 
         // Function to fetch weather data by coordinates (latitude and longitude)
         function fetchWeatherDataByCoords(lat, lon) {
             let url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${key}`;
             fetchWeather(url);
+
+
+        //     // My new code to get next 5 days data
+        //     try {
+        //         const forecastResponse =  fetch(`https://api.openweathermap.org/data/2.5/onecall?lat=${lat}&lon=${lon}&exclude=current,minutely,hourly&appid=${key}`);
+        // if (!forecastResponse.ok) {
+        //     throw new Error('Forecast data not available for the specified city.');
+        // }
+        // const forecastData =  forecastResponse.json();
+        // console.log(forecastResponse)
+        //     } catch (error) {
+        //         alert(error.message);
+        //     }
+        // Ends here the data
+        
         }
+
+
 
         // Fetch weather data from OpenWeatherMap API
         function fetchWeather(url) {
